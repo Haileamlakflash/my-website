@@ -39,8 +39,8 @@
     }
 
     .point {
-      width: 20px;
-      height: 20px;
+      width: 50px;
+      height: 50px;
       position: absolute;
       border-radius: 50%;
       background-color: white;
@@ -230,6 +230,68 @@
         this.value = ''; // Clear input after submission (if desired)
       }
     });
+
+    const canvas = document.createElement('canvas');
+const ctx = canvas.getContext('2d');
+document.body.appendChild(canvas);
+canvas.id = 'lineCanvas';
+canvas.style.position = 'absolute';
+canvas.style.top = '0';
+canvas.style.left = '0';
+canvas.style.pointerEvents = 'none';
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+// Function to draw a line between two points
+function drawLine(start, end) {
+  ctx.beginPath();
+  ctx.moveTo(start.x, start.y);
+  ctx.lineTo(end.x, end.y);
+  ctx.strokeStyle = '#4CAF50';
+  ctx.lineWidth = 5;
+  ctx.stroke();
+}
+
+// Update canvas size on resize
+window.addEventListener('resize', () => {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+});
+
+// Update handleDraw function to draw lines
+function handleDraw(event) {
+  const x = event.clientX || event.touches[0].clientX;
+  const y = event.clientY || event.touches[0].clientY;
+
+  points.forEach((point, index) => {
+    const rect = point.getBoundingClientRect();
+    const pointX = rect.left + rect.width / 2;
+    const pointY = rect.top + rect.height / 2;
+
+    const distance = Math.sqrt(Math.pow(x - pointX, 2) + Math.pow(y - pointY, 2));
+
+    if (distance < rect.width / 2 && !patternData.includes(index)) {
+      point.classList.add('connected');
+      if (patternData.length > 0) {
+        const prevIndex = patternData[patternData.length - 1];
+        const prevRect = points[prevIndex].getBoundingClientRect();
+        drawLine(
+          { x: prevRect.left + prevRect.width / 2, y: prevRect.top + prevRect.height / 2 },
+          { x: pointX, y: pointY }
+        );
+      }
+      patternData.push(index);
+    }
+  });
+}
+
+// Reset the canvas on resetPattern
+function resetPattern() {
+  patternData = [];
+  points.forEach(point => point.classList.remove('connected'));
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
   </script>
 </body>
 </html>
