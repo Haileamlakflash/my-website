@@ -268,8 +268,6 @@ window.addEventListener('resize', () => {
   canvas.height = window.innerHeight;
 });
 
-const points = Array.from(document.querySelectorAll('.touch-area'));
-
 // Update handleDraw function to draw lines
 function handleDraw(event) {
   const x = event.clientX || event.touches[0].clientX;
