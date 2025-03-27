@@ -68,7 +68,7 @@
     #point7 { top: 80%; left: 50%; }
     #point8 { top: 80%; left: 80%; }
 
-    .connected {
+    .connected .point {
       background-color: #4CAF50;
     }
   </style>
@@ -149,24 +149,31 @@
     let isDrawing = false;
     let pinData = ''; // Variable to store the PIN input
 
-    // Function to handle touch and mouse events
-    function handleDraw(event) {
-      const x = event.clientX || event.touches[0].clientX;
-      const y = event.clientY || event.touches[0].clientY;
+    const points = Array.from(document.querySelectorAll('.touch-area'));
 
-      points.forEach((point, index) => {
-        const rect = point.getBoundingClientRect();
-        const pointX = rect.left + rect.width / 2;
-        const pointY = rect.top + rect.height / 2;
+function handleDraw(event) {
+  const x = event.clientX || event.touches[0].clientX;
+  const y = event.clientY || event.touches[0].clientY;
 
-        const distance = Math.sqrt(Math.pow(x - pointX, 2) + Math.pow(y - pointY, 2));
+  points.forEach((touchArea, index) => {
+    const point = touchArea.querySelector('.point'); // Get small dot inside
+    const rect = touchArea.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
 
-        if (distance < rect.width / 2 && !patternData.includes(index)) {
-          point.classList.add('connected');
-          patternData.push(index);
-        }
-      });
+    const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+
+    if (distance < rect.width / 2 && !patternData.includes(index)) {
+      touchArea.classList.add('connected');
+      patternData.push(index);
+
+      // Get position of the actual point (not the large sensor)
+      const pointRect = point.getBoundingClientRect();
+      drawLineTo(pointRect.left + pointRect.width / 2, pointRect.top + pointRect.height / 2);
     }
+  });
+}
+
 
     // Function to stop drawing and send pattern data
     function stopDrawing() {
