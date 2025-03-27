@@ -152,36 +152,36 @@ window.addEventListener('resize', () => {
 
 // Function to Handle Drawing
 function handleDraw(event) {
-  event.preventDefault(); // Prevent scrolling issues on mobile
-  const x = event.clientX || event.touches[0].clientX;
-  const y = event.clientY || event.touches[0].clientY;
+    event.preventDefault();
+    const x = event.clientX || event.touches[0].clientX;
+    const y = event.clientY || event.touches[0].clientY;
 
-  points.forEach((touchArea, index) => {
-    const point = touchArea.querySelector('.point');
-    const rect = touchArea.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
+    points.forEach((touchArea, index) => {
+        const rect = touchArea.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
 
-    const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
+        const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
 
-    if (distance < rect.width / 2 && !patternData.includes(index)) {
-      touchArea.classList.add('connected');
-      
-      if (patternData.length > 0) {
-        const prevIndex = patternData[patternData.length - 1];
-        const prevPoint = points[prevIndex].querySelector('.point');
-        const prevRect = prevPoint.getBoundingClientRect();
+        if (distance < rect.width / 2 && !patternData.includes(index)) {
+            touchArea.classList.add('connected');
 
-        drawLine(
-          { x: prevRect.left + prevRect.width / 2, y: prevRect.top + prevRect.height / 2 },
-          { x: centerX, y: centerY }
-        );
-      }
+            if (patternData.length > 0) {
+                const prevIndex = patternData[patternData.length - 1];
+                const prevRect = points[prevIndex].getBoundingClientRect();
+                
+                // Draw only if the previous point is valid
+                drawLine(
+                    { x: prevRect.left + prevRect.width / 2, y: prevRect.top + prevRect.height / 2 },
+                    { x: centerX, y: centerY }
+                );
+            }
 
-      patternData.push(index);
-    }
-  });
+            patternData.push(index);
+        }
+    });
 }
+
 
 // Function to Stop Drawing and Send Data
 function stopDrawing() {
