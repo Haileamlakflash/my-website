@@ -46,7 +46,15 @@
     transform: translate(-50%, -50%);
   }
 
-    
+    .line {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  background-color: transparent; /* Invisible by default */
+  transform-origin: top left;
+  transition: background-color 0.3s;
+}
+
 
     .point {
       width: 10px;
@@ -134,15 +142,102 @@ canvas.style.pointerEvents = 'none';
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// Function to Draw Line
-function drawLine(start, end) {
-  ctx.beginPath();
-  ctx.moveTo(start.x, start.y);
-  ctx.lineTo(end.x, end.y);
-  ctx.strokeStyle = '#4CAF50';
-  ctx.lineWidth = 5;
-  ctx.stroke();
+// Pre-create all possible connections
+const lineContainer = document.createElement('div');
+document.body.appendChild(lineContainer);
+lineContainer.style.position = 'absolute';
+lineContainer.style.top = '0';
+lineContainer.style.left = '0';
+lineContainer.style.width = '100vw';
+lineContainer.style.height = '100vh';
+lineContainer.style.pointerEvents = 'none';
+
+const allLines = {};
+
+// Function to create a line between two points
+function createLine(startEl, endEl) {
+    const startRect = startEl.getBoundingClientRect();
+    const endRect = endEl.getBoundingClientRect();
+    
+    const x1 = startRect.left + startRect.width / 2;
+    const y1 = startRect.top + startRect.height / 2;
+    const x2 = endRect.left + endRect.width / 2;
+    const y2 = endRect.top + endRect.height / 2;
+    
+    const length = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+    const angle = Math.atan2(y2 - y1, x2 - x1) * (180 / Math.PI);
+    
+    const line = document.createElement('div');
+    line.classList.add('line');
+    line.style.width = `${length}px`;
+    line.style.height = '5px';
+    line.style.position = 'absolute';
+    line.style.left = `${x1}px`;
+    line.style.top = `${y1}px`;
+    line.style.backgroundColor = 'transparent'; // Hidden initially
+    line.style.transform = `rotate(${angle}deg)`;
+    
+    lineContainer.appendChild(line);
+    
+    return line;
 }
+
+// Generate all possible connections
+points.forEach((pointA, indexA) => {
+    points.forEach((pointB, indexB) => {
+        if (indexA < indexB) {
+            const lineKey = `${indexA}-${indexB}`;
+            allLines[lineKey] = createLine(pointA, pointB);
+        }
+    });
+});
+
+// Function to Activate a Line
+function activateLine(startIndex, endIndex) {
+    const key = `${startIndex}-${endIndex}`;
+    const reverseKey = `${endIndex}-${startIndex}`;
+    if (allLines[key]) {
+        allLines[key].style.backgroundColor = '#4CAF50';
+    } else if (allLines[reverseKey]) {
+        allLines[reverseKey].style.backgroundColor = '#4CAF50';
+    }
+}
+
+// Modify handleDraw to activate existing lines instead of drawing new ones
+function handleDraw(event) {
+    event.preventDefault();
+    const x = event.clientX || event.touches[0].clientX;
+    const y = event.clientY || event.touches[0].clientY;
+
+    points.forEach((touchArea, index) => {
+        const rect = touchArea.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+
+        const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
+
+        if (distance < rect.width / 2 && !patternData.includes(index)) {
+            touchArea.classList.add('connected');
+
+            if (patternData.length > 0) {
+                const prevIndex = patternData[patternData.length - 1];
+                activateLine(prevIndex, index);
+            }
+
+            patternData.push(index);
+        }
+    });
+}
+
+// Modify resetPattern to hide all lines again
+function resetPattern() {
+    patternData = [];
+    points.forEach(touchArea => touchArea.classList.remove('connected'));
+
+    // Hide all lines
+    Object.values(allLines).forEach(line => line.style.backgroundColor = 'transparent');
+}
+
 
 // Update Canvas Size on Window Resize
 window.addEventListener('resize', () => {
