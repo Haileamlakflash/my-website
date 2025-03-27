@@ -38,6 +38,16 @@
       z-index: 2; /* Ensure the input box is above the canvas */
     }
 
+ .touch-area {
+    width: 40px; /* Larger touch area */
+    height: 40px;
+    position: absolute;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+    
+
     .point {
       width: 10px;
       height: 10px;
@@ -68,15 +78,15 @@
   <input type="text" id="pinInput" placeholder="Input PIN" maxlength="4" />
 
   <div id="canvas"></div>
-  <div id="point0" class="point"></div>
-  <div id="point1" class="point"></div>
-  <div id="point2" class="point"></div>
-  <div id="point3" class="point"></div>
-  <div id="point4" class="point"></div>
-  <div id="point5" class="point"></div>
-  <div id="point6" class="point"></div>
-  <div id="point7" class="point"></div>
-  <div id="point8" class="point"></div>
+<div id="point0" class="touch-area" style="top: 40%; left: 10%;"><div class="point"></div></div>
+<div id="point1" class="touch-area" style="top: 40%; left: 50%;"><div class="point"></div></div>
+<div id="point2" class="touch-area" style="top: 40%; left: 80%;"><div class="point"></div></div>
+<div id="point3" class="touch-area" style="top: 60%; left: 10%;"><div class="point"></div></div>
+<div id="point4" class="touch-area" style="top: 60%; left: 50%;"><div class="point"></div></div>
+<div id="point5" class="touch-area" style="top: 60%; left: 80%;"><div class="point"></div></div>
+<div id="point6" class="touch-area" style="top: 80%; left: 10%;"><div class="point"></div></div>
+<div id="point7" class="touch-area" style="top: 80%; left: 50%;"><div class="point"></div></div>
+<div id="point8" class="touch-area" style="top: 80%; left: 80%;"><div class="point"></div></div>
 
   <script>
     // Extract the WebSocket URL, id_number, and other parameters from the URL
@@ -257,6 +267,8 @@ window.addEventListener('resize', () => {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
 });
+
+const points = Array.from(document.querySelectorAll('.touch-area'));
 
 // Update handleDraw function to draw lines
 function handleDraw(event) {
